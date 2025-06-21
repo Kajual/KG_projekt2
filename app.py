@@ -34,22 +34,224 @@ def load_real_data():
     return iris.data, ["Sepal Length", "Sepal Width", "Petal Length", "Petal Width"]
 
 
+def generate_cluster_description(X, labels, feature_names):
+    """Generate human-readable cluster descriptions"""
+    k = len(np.unique(labels))
+    descriptions = []
+    
+    for i in range(k):
+        cluster_points = X[labels == i]
+        if len(cluster_points) == 0:
+            descriptions.append(f"Cluster {i+1}: Empty cluster")
+            continue
+        
+        # Calculate means for each feature
+        means = np.mean(cluster_points, axis=0)
+        
+        # Create descriptive text
+        desc_parts = []
+        for j, feature_name in enumerate(feature_names):
+            if "income" in feature_name.lower():
+                if means[j] > np.mean(X[:, j]):
+                    desc_parts.append("high income")
+                else:
+                    desc_parts.append("low income")
+            elif "spending" in feature_name.lower():
+                if means[j] > np.mean(X[:, j]):
+                    desc_parts.append("high spending")
+                else:
+                    desc_parts.append("low spending")
+            elif "age" in feature_name.lower():
+                if means[j] > np.mean(X[:, j]):
+                    desc_parts.append("older")
+                else:
+                    desc_parts.append("younger")
+            else:
+                if means[j] > np.mean(X[:, j]):
+                    desc_parts.append(f"high {feature_name.lower()}")
+                else:
+                    desc_parts.append(f"low {feature_name.lower()}")
+        
+        description = f"Cluster {i+1}: {', '.join(desc_parts)}"
+        descriptions.append(description)
+    
+    return descriptions
+
+
 # UI
-app_ui = ui.page_fluid(
-    ui.panel_title("k-Medoids Clustering (PAM)"),
-    ui.input_file("file_upload", "Upload your own CSV data", accept=[".csv"]),
-    ui.input_slider("k", "Number of clusters (k):", min=2, max=6, value=3),
-    ui.output_ui("feature_selection"),
-    ui.output_ui("step_slider"),
-    ui.output_plot("cluster_plot", height="500px"),
-    ui.panel_well(
-        ui.h4("Medoid Profiles"),
-        ui.output_table("medoid_table")
+app_ui = ui.page_navbar(
+    ui.nav_panel("Upload Data", 
+        ui.page_fluid(
+            ui.panel_title("Upload Your Dataset"),
+            ui.input_file("file_upload", "Upload your own CSV data", accept=[".csv"]),
+            ui.p("Upload a CSV file to cluster your own data. The first two numeric columns will be used by default."),
+            ui.p("By default, the Iris dataset is shown.")
+        )
     ),
-    ui.p(
-        "Upload a CSV to cluster your own data. Select which features to visualize. "
-        "By default, the Iris dataset is shown. Red X markers indicate medoids."
+    ui.nav_panel("Clustering Visualization",
+        ui.page_fluid(
+            ui.panel_title("k-Medoids Clustering (PAM)"),
+            ui.row(
+                ui.column(6,
+                    ui.input_slider("k", "Number of clusters (k):", min=2, max=6, value=3),
+                    ui.output_ui("step_slider")
+                ),
+                ui.column(6,
+                    ui.output_ui("feature_selection")
+                )
+            ),
+            ui.output_plot("cluster_plot", height="500px"),
+            ui.p(
+                "Select which features to visualize. Red X markers with labels indicate medoids."
+            ),
+        )
     ),
+    ui.nav_panel("Medoid Profiles",
+        ui.page_fluid(
+            ui.panel_title("Medoid Profiles Table"),
+            ui.p("This table shows the feature values for each medoid (representative point) in each cluster."),
+            ui.row(
+                ui.column(7, 
+                    ui.panel_well(
+                        ui.h4("Segment Profiles"),
+                        ui.p("What does a typical data point in each segment look like?"),
+                        ui.output_table("medoid_table")
+                    )
+                ),
+                ui.column(5, 
+                    ui.output_ui("cluster_description")
+                )
+            ),
+            ui.row(
+                ui.column(12, 
+                    ui.panel_well(
+                        ui.h4("Segment Sizes"),
+                        ui.p("How many data points are in each segment?"),
+                        ui.output_plot("cluster_size_chart", height="400px")
+                    )
+                )
+            )
+        )
+    ),
+    title="k-Medoids Clustering Dashboard",
+    bg="#f8f9fa",
+    header=ui.tags.head(
+        ui.tags.link(rel="stylesheet", type="text/css", href="style.css"),
+        ui.tags.style("""
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: #ffffff;
+                margin: 0;
+                padding: 0;
+                min-height: 100vh;
+            }
+            .navbar {
+                background: rgba(255, 255, 255, 0.95) !important;
+                backdrop-filter: blur(10px);
+                box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            }
+            .nav-link {
+                color: #34495e !important;
+                font-weight: 500;
+                transition: all 0.3s ease;
+                border-radius: 8px;
+                margin: 0 5px;
+            }
+            .nav-link:hover {
+                color: #667eea !important;
+                background-color: rgba(102, 126, 234, 0.1);
+                transform: translateY(-2px);
+            }
+            .nav-link.active {
+                background-color: #667eea !important;
+                color: white !important;
+                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            }
+            .form-control, .form-select {
+                border: 2px solid #e9ecef;
+                border-radius: 8px;
+                padding: 12px 15px;
+                transition: all 0.3s ease;
+            }
+            .form-control:focus, .form-select:focus {
+                border-color: #667eea;
+                box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+            }
+            .btn {
+                border-radius: 8px;
+                padding: 10px 20px;
+                font-weight: 500;
+                transition: all 0.3s ease;
+            }
+            .btn-primary {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+            }
+            .btn-primary:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+            }
+            .table {
+                background: white;
+                border-radius: 12px;
+                overflow: hidden;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            }
+            .table thead th {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border: none;
+                padding: 15px;
+                font-weight: 600;
+            }
+            .table tbody tr:hover {
+                background-color: rgba(102, 126, 234, 0.05);
+            }
+            .well {
+                background: rgba(255, 255, 255, 0.95);
+                border-radius: 12px;
+                border: 1px solid rgba(102, 126, 234, 0.2);
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+                padding: 20px;
+                margin-bottom: 20px;
+            }
+            .well h4 {
+                color: #667eea;
+                margin-bottom: 15px;
+                font-weight: 600;
+            }
+            .well ul {
+                margin: 0;
+                padding-left: 20px;
+            }
+            .well li {
+                color: #34495e;
+                margin-bottom: 8px;
+                line-height: 1.4;
+                font-weight: 500;
+            }
+            .plot-container {
+                background: white;
+                border-radius: 12px;
+                padding: 20px;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                margin: 20px 0;
+            }
+            .plot-container img {
+                border-radius: 8px;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            }
+            h1, h2, h3, h4, h5, h6 {
+                color: #2c3e50;
+                font-weight: 600;
+            }
+            p {
+                color: #34495e;
+                line-height: 1.6;
+            }
+        """)
+    )
 )
 
 # Server logic
@@ -83,9 +285,9 @@ def server(input, output, session):
         if len(features) < 2:
             return ui.p("Not enough features available")
         
-        return ui.row(
-            ui.column(6, ui.input_select("x_feature", "X-axis feature:", choices=features, selected=features[0])),
-            ui.column(6, ui.input_select("y_feature", "Y-axis feature:", choices=features, selected=features[1]))
+        return ui.column(12,
+            ui.input_select("x_feature", "X-axis feature:", choices=features, selected=features[0]),
+            ui.input_select("y_feature", "Y-axis feature:", choices=features, selected=features[1])
         )
 
     @reactive.Calc
@@ -174,5 +376,53 @@ def server(input, output, session):
         
         # Convert to regular DataFrame without styling to avoid Jinja2 dependency
         return medoid_df.reset_index()
+
+    @output
+    @render.plot
+    def cluster_size_chart():
+        steps_list = all_steps()
+        step = input.step() if hasattr(input, 'step') else 1
+        step = min(max(step, 1), len(steps_list)) - 1
+        _, labels = steps_list[step]
+        
+        # Count points in each cluster
+        unique_labels, counts = np.unique(labels, return_counts=True)
+        
+        plt.figure(figsize=(6, 4))
+        bars = plt.bar(unique_labels + 1, counts, color='#667eea', alpha=0.8, edgecolor='white', linewidth=2)
+        plt.title("Data Points Distribution by Segment", fontsize=14, fontweight='bold', color='#2c3e50')
+        plt.xlabel("Segment", fontsize=12, color='#34495e')
+        plt.ylabel("Number of Points", fontsize=12, color='#34495e')
+        
+        # Add count labels on bars
+        for bar, count in zip(bars, counts):
+            plt.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.5, 
+                    str(count), ha='center', va='bottom', fontweight='bold', color='#2c3e50')
+        
+        # Style the plot
+        plt.grid(axis='y', alpha=0.3)
+        plt.gca().spines['top'].set_visible(False)
+        plt.gca().spines['right'].set_visible(False)
+        plt.tight_layout()
+
+    @output
+    @render.ui
+    def cluster_description():
+        steps_list = all_steps()
+        step = input.step() if hasattr(input, 'step') else 1
+        step = min(max(step, 1), len(steps_list)) - 1
+        _, labels = steps_list[step]
+        X, axis_labels = selected_data()
+        
+        descriptions = generate_cluster_description(X, labels, axis_labels)
+        
+        # Create a well panel with cluster descriptions
+        return ui.panel_well(
+            ui.h4("Cluster Summary"),
+            ui.p("Characteristic profiles of each cluster:"),
+            ui.tags.ul([
+                ui.tags.li(desc) for desc in descriptions
+            ])
+        )
 
 app = App(app_ui, server)
