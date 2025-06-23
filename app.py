@@ -34,14 +34,11 @@ def k_medoids_steps(X, k, max_iter=100, min_steps=None):
 
         medoids = new_medoids
 
-        # If we have a minimum number of steps to show and we've converged,
-        # continue adding the same final state until we reach min_steps
         if converged and min_steps and len(steps) >= min_steps:
             break
         elif converged and not min_steps:
             break
 
-    # If min_steps is specified and we have fewer steps, repeat the final state
     if min_steps and len(steps) < min_steps:
         final_medoids, final_labels = steps[-1]
         while len(steps) < min_steps:
@@ -66,10 +63,8 @@ def generate_cluster_description(X, labels, feature_names):
             descriptions.append(f"Cluster {i + 1}: Empty cluster")
             continue
 
-        # Calculate means for each feature
         means = np.mean(cluster_points, axis=0)
 
-        # Create descriptive text
         desc_parts = []
         for j, feature_name in enumerate(feature_names):
             if "income" in feature_name.lower():
@@ -99,7 +94,6 @@ def generate_cluster_description(X, labels, feature_names):
     return descriptions
 
 
-# UI
 app_ui = ui.page_navbar(
     ui.nav_panel("Upload Data",
                  ui.page_fluid(
@@ -695,13 +689,11 @@ app_ui = ui.page_navbar(
 )
 
 
-# Server logic
 def server(input, output, session):
     data = reactive.Value(load_real_data()[0])
     feature_names = reactive.Value(load_real_data()[1])
     original_df = reactive.Value(None)
 
-    # Animation state
     anim_running = reactive.Value(False)
     anim_current_step = reactive.Value(1)
 
@@ -726,43 +718,33 @@ def server(input, output, session):
     @output
     @render.table
     def medoid_table():
-        # Use the animation functions as the source of truth
         steps_list = anim_all_steps()
         if not steps_list:
             return pd.DataFrame()
 
-        # Use the final step (converged state) for analysis
         step = len(steps_list) - 1
         medoids, labels = steps_list[step]
         X, axis_labels = anim_selected_data()
 
-        # Create DataFrame for medoid details
         medoid_df = pd.DataFrame(medoids, columns=axis_labels)
         medoid_df.index = [f"Medoid {i + 1}" for i in range(len(medoids))]
 
-        # Add cluster size information - handle non-consecutive cluster indices
         unique_labels, counts = np.unique(labels, return_counts=True)
-        # Create a mapping from cluster index to count
         cluster_size_map = dict(zip(unique_labels, counts))
-        # Map each medoid to its cluster size
         medoid_df['Cluster Size'] = [cluster_size_map.get(i, 0) for i in range(len(medoids))]
 
-        # Convert to regular DataFrame without styling to avoid Jinja2 dependency
         return medoid_df.reset_index()
 
     @output
     @render.plot
     def cluster_size_chart():
-        # Use the animation functions as the source of truth
         steps_list = anim_all_steps()
         if not steps_list:
             return None
 
-        # Use the final step (converged state) for analysis
         step = len(steps_list) - 1
         _, labels = steps_list[step]
 
-        # Count points in each cluster
         unique_labels, counts = np.unique(labels, return_counts=True)
 
         plt.figure(figsize=(6, 4))
@@ -771,12 +753,10 @@ def server(input, output, session):
         plt.xlabel("Segment", fontsize=12, color='#34495e')
         plt.ylabel("Number of Points", fontsize=12, color='#34495e')
 
-        # Add count labels on bars
         for bar, count in zip(bars, counts):
             plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.5,
                      str(count), ha='center', va='bottom', fontweight='bold', color='#2c3e50')
 
-        # Style the plot
         plt.grid(axis='y', alpha=0.3)
         plt.gca().spines['top'].set_visible(False)
         plt.gca().spines['right'].set_visible(False)
@@ -785,19 +765,16 @@ def server(input, output, session):
     @output
     @render.ui
     def cluster_description():
-        # Use the animation functions as the source of truth
         steps_list = anim_all_steps()
         if not steps_list:
             return ui.p("No clustering data available. Please configure clustering in the Interactive Clustering tab.")
 
-        # Use the final step (converged state) for analysis
         step = len(steps_list) - 1
         _, labels = steps_list[step]
         X, axis_labels = anim_selected_data()
 
         descriptions = generate_cluster_description(X, labels, axis_labels)
 
-        # Create a well panel with cluster descriptions
         return ui.panel_well(
             ui.h4("Cluster Summary"),
             ui.p("Characteristic profiles of each cluster:"),
@@ -806,7 +783,6 @@ def server(input, output, session):
             ])
         )
 
-    # Animation tab functionality (copied from Interactive Clustering)
     @output
     @render.ui
     def anim_feature_selection():
@@ -857,12 +833,10 @@ def server(input, output, session):
 
         fig, ax = plt.subplots(figsize=(7, 7))
 
-        # Plot data points
         scatter = ax.scatter(
             X[:, 0], X[:, 1], c=labels, cmap="viridis", alpha=0.7, s=60, label="Points"
         )
 
-        # Plot medoids with labels
         medoid_scatter = ax.scatter(
             medoids[:, 0],
             medoids[:, 1],
@@ -874,7 +848,6 @@ def server(input, output, session):
             linewidth=2,
         )
 
-        # Add medoid labels
         for i, (x, y) in enumerate(medoids):
             ax.annotate(f'M{i + 1}', (x, y), xytext=(5, 5),
                         textcoords='offset points', fontsize=12,
@@ -887,7 +860,6 @@ def server(input, output, session):
         plt.legend()
         plt.tight_layout()
 
-    # Animation controls
     @reactive.Effect
     @reactive.event(input.start_anim)
     def start_anim():
@@ -899,7 +871,6 @@ def server(input, output, session):
     def stop_anim():
         anim_running.set(False)
 
-    # Handle animation step updates
     @reactive.Effect
     @reactive.event(input.anim_step_js, ignore_none=False)
     def update_anim_step():
@@ -913,15 +884,11 @@ def server(input, output, session):
                 anim_current_step.set(current_step)
                 anim_running.set(True)
 
-    # Reset to step 1 when k changes
     @reactive.Effect
     def reset_anim_on_k_change():
         if hasattr(input, 'anim_k'):
             anim_current_step.set(1)
             anim_running.set(False)
-
-    # Keep the old animation functionality for the complex tab
-    # (This will be removed in a future update, keeping for compatibility)
 
 
 app = App(app_ui, server)
